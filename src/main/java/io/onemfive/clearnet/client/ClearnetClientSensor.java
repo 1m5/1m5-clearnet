@@ -65,8 +65,6 @@ public class ClearnetClientSensor extends BaseSensor {
     protected ConnectionSpec httpsStrongSpec;
     protected OkHttpClient httpsStrongClient;
 
-    protected HttpEnvelopeHandler httpHandler;
-
     protected Proxy proxy = null;
 
     public ClearnetClientSensor(SensorsService sensorsService, Envelope.Sensitivity sensitivity, Integer priority) {
@@ -250,7 +248,7 @@ public class ClearnetClientSensor extends BaseSensor {
 
     @Override
     public boolean reply(Envelope e) {
-        httpHandler.reply(e);
+        sensorsService.sendToBus(e);
         return true;
     }
 
