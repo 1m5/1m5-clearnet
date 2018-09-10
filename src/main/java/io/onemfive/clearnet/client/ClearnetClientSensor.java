@@ -67,6 +67,8 @@ public class ClearnetClientSensor extends BaseSensor {
 
     protected Proxy proxy = null;
 
+    public ClearnetClientSensor() {super();}
+
     public ClearnetClientSensor(SensorsService sensorsService, Envelope.Sensitivity sensitivity, Integer priority) {
         super(sensorsService, sensitivity, priority);
     }
