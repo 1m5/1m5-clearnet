@@ -78,10 +78,10 @@ public class HttpEnvelopeHandler extends AbstractHandler {
 
     private static Logger LOG = Logger.getLogger(HttpEnvelopeHandler.class.getName());
 
-    private ClearnetSensor sensor;
+    private ClearnetClientSensor sensor;
     private Map<Long,ClientHold> requests = new HashMap<>();
 
-    public HttpEnvelopeHandler(ClearnetSensor sensor) {
+    public HttpEnvelopeHandler(ClearnetClientSensor sensor) {
         this.sensor = sensor;
     }
 

@@ -22,9 +22,9 @@ import java.util.logging.Logger;
  *
  * @author objectorange
  */
-public class ClearnetSensor extends BaseSensor {
+public class ClearnetClientSensor extends BaseSensor {
 
-    private static final Logger LOG = Logger.getLogger(ClearnetSensor.class.getName());
+    private static final Logger LOG = Logger.getLogger(ClearnetClientSensor.class.getName());
 
     public static final String PROP_HTTP_CLIENT = "1m5.clearnet.client"; // true | false
     public static final String PROP_HTTP_CLIENT_TLS = "1m5.clearnet.client.tls"; // true | false
@@ -69,7 +69,7 @@ public class ClearnetSensor extends BaseSensor {
 
     protected Proxy proxy = null;
 
-    public ClearnetSensor(SensorsService sensorsService, Envelope.Sensitivity sensitivity, Integer priority) {
+    public ClearnetClientSensor(SensorsService sensorsService, Envelope.Sensitivity sensitivity, Integer priority) {
         super(sensorsService, sensitivity, priority);
     }
 
@@ -191,7 +191,7 @@ public class ClearnetSensor extends BaseSensor {
                 }
 //            } else {
 //                try {
-//                    System.out.println(ClearnetSensor.class.getSimpleName() + ": using strong connection...");
+//                    System.out.println(ClearnetClientSensor.class.getSimpleName() + ": using strong connection...");
 //                    response = httpsStrongClient.newCall(req).execute();
 //                    if (!response.isSuccessful()) {
 //                        m.addErrorMessage(response.code()+"");
