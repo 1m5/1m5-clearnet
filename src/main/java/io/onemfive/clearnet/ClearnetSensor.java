@@ -16,6 +16,7 @@ import javax.net.ssl.*;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
+import java.net.Proxy;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -26,7 +27,7 @@ import java.util.logging.Logger;
  *
  * @author objectorange
  */
-public final class ClearnetSensor extends BaseSensor {
+public class ClearnetSensor extends BaseSensor {
 
     private static final Logger LOG = Logger.getLogger(ClearnetSensor.class.getName());
 
@@ -38,9 +39,9 @@ public final class ClearnetSensor extends BaseSensor {
     public static final String PROP_HTTP_SERVER_PORT = "1m5.sensors.clearnet.http.server.port"; // integer
     public static final String PROP_HTTP_SERVER_PATH = "1m5.sensors.clearnet.http.server.path"; // path
 
-    private static final Set<String> trustedHosts = new HashSet<>();
+    protected static final Set<String> trustedHosts = new HashSet<>();
 
-    private static final HostnameVerifier hostnameVerifier = new HostnameVerifier() {
+    protected static final HostnameVerifier hostnameVerifier = new HostnameVerifier() {
 
         @Override
         public boolean verify(String hostname, SSLSession session) {
@@ -48,7 +49,7 @@ public final class ClearnetSensor extends BaseSensor {
         }
     };
 
-    private X509TrustManager x509TrustManager = new X509TrustManager() {
+    protected X509TrustManager x509TrustManager = new X509TrustManager() {
 
         public java.security.cert.X509Certificate[] getAcceptedIssuers() {
             return new java.security.cert.X509Certificate[]{};
@@ -62,34 +63,29 @@ public final class ClearnetSensor extends BaseSensor {
     };
 
     // Create a trust manager that does not validate certificate chains
-    private TrustManager[] trustAllCerts = new TrustManager[]{ x509TrustManager};
+    protected TrustManager[] trustAllCerts = new TrustManager[]{ x509TrustManager};
 
-    private ConnectionSpec httpSpec;
-    private OkHttpClient httpClient;
+    protected ConnectionSpec httpSpec;
+    protected OkHttpClient httpClient;
 
-    private ConnectionSpec httpsCompatibleSpec;
-    private OkHttpClient httpsCompatibleClient;
+    protected ConnectionSpec httpsCompatibleSpec;
+    protected OkHttpClient httpsCompatibleClient;
 
-    private ConnectionSpec httpsStrongSpec;
-    private OkHttpClient httpsStrongClient;
+    protected ConnectionSpec httpsStrongSpec;
+    protected OkHttpClient httpsStrongClient;
 
-    private Server server;
-    private HttpEnvelopeHandler httpHandler;
+    protected Server server;
+    protected HttpEnvelopeHandler httpHandler;
+
+    protected Proxy proxy = null;
 
     public ClearnetSensor(SensorsService sensorsService, Envelope.Sensitivity sensitivity, Integer priority) {
         super(sensorsService, sensitivity, priority);
     }
 
     @Override
-    public Map<String, Peer> getPeers() {
-        Map<String, Peer> peers = new HashMap<>();
-
-        return peers;
-    }
-
-    @Override
     public String[] getOperationEndsWith() {
-        return new String[]{".1m5"};
+        return new String[]{".html"};
     }
 
     @Override
@@ -99,7 +95,7 @@ public final class ClearnetSensor extends BaseSensor {
 
     @Override
     public String[] getURLEndsWith() {
-        return new String[]{".1m5"};
+        return new String[]{".html",".htm"};
     }
 
     @Override
@@ -276,11 +272,20 @@ public final class ClearnetSensor extends BaseSensor {
             httpSpec = new ConnectionSpec
                     .Builder(ConnectionSpec.CLEARTEXT)
                     .build();
-            httpClient = new OkHttpClient.Builder()
-                    .connectionSpecs(Collections.singletonList(httpSpec))
-                    .retryOnConnectionFailure(true)
-                    .followRedirects(true)
-                    .build();
+            if(proxy == null) {
+                httpClient = new OkHttpClient.Builder()
+                        .connectionSpecs(Collections.singletonList(httpSpec))
+                        .retryOnConnectionFailure(true)
+                        .followRedirects(true)
+                        .build();
+            } else {
+                httpClient = new OkHttpClient.Builder()
+                        .connectionSpecs(Collections.singletonList(httpSpec))
+                        .retryOnConnectionFailure(true)
+                        .followRedirects(true)
+                        .proxy(proxy)
+                        .build();
+            }
 
             System.setProperty("https.protocols", "TLSv1,TLSv1.1,TLSv1.2,TLSv1.3");
             SSLContext sc = null;
@@ -295,13 +300,18 @@ public final class ClearnetSensor extends BaseSensor {
 //                    .allEnabledCipherSuites()
                         .build();
 
-                httpsCompatibleClient = new OkHttpClient.Builder()
-//                    .connectionSpecs(Collections.singletonList(httpsCompatibleSpec))
-//                    .retryOnConnectionFailure(false)
-//                    .followSslRedirects(false)
-                        .sslSocketFactory(sc.getSocketFactory(), x509TrustManager)
-                        .hostnameVerifier(hostnameVerifier)
-                        .build();
+                if(proxy == null) {
+                    httpsCompatibleClient = new OkHttpClient.Builder()
+                            .sslSocketFactory(sc.getSocketFactory(), x509TrustManager)
+                            .hostnameVerifier(hostnameVerifier)
+                            .build();
+                } else {
+                    httpsCompatibleClient = new OkHttpClient.Builder()
+                            .sslSocketFactory(sc.getSocketFactory(), x509TrustManager)
+                            .hostnameVerifier(hostnameVerifier)
+                            .proxy(proxy)
+                            .build();
+                }
 
                 httpsStrongSpec = new ConnectionSpec
                         .Builder(ConnectionSpec.MODERN_TLS)
@@ -312,13 +322,24 @@ public final class ClearnetSensor extends BaseSensor {
                                 CipherSuite.TLS_DHE_RSA_WITH_AES_128_GCM_SHA256)
                         .build();
 
-                httpsStrongClient = new OkHttpClient.Builder()
-                        .connectionSpecs(Collections.singletonList(httpsStrongSpec))
-                        .retryOnConnectionFailure(true)
-                        .followSslRedirects(true)
-                        .sslSocketFactory(sc.getSocketFactory(), x509TrustManager)
-                        .hostnameVerifier(hostnameVerifier)
-                        .build();
+                if(proxy == null) {
+                    httpsStrongClient = new OkHttpClient.Builder()
+                            .connectionSpecs(Collections.singletonList(httpsStrongSpec))
+                            .retryOnConnectionFailure(true)
+                            .followSslRedirects(true)
+                            .sslSocketFactory(sc.getSocketFactory(), x509TrustManager)
+                            .hostnameVerifier(hostnameVerifier)
+                            .build();
+                } else {
+                    httpsStrongClient = new OkHttpClient.Builder()
+                            .connectionSpecs(Collections.singletonList(httpsStrongSpec))
+                            .retryOnConnectionFailure(true)
+                            .followSslRedirects(true)
+                            .sslSocketFactory(sc.getSocketFactory(), x509TrustManager)
+                            .hostnameVerifier(hostnameVerifier)
+                            .proxy(proxy)
+                            .build();
+                }
 
             } catch (Exception e) {
                 e.printStackTrace();
