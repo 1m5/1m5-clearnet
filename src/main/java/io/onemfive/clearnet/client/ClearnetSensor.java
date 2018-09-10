@@ -1,21 +1,16 @@
-package io.onemfive.clearnet;
+package io.onemfive.clearnet.client;
 
 import io.onemfive.sensors.BaseSensor;
 import io.onemfive.sensors.SensorsService;
 import io.onemfive.data.Message;
-import io.onemfive.data.Peer;
 import io.onemfive.data.util.DLC;
 import io.onemfive.data.DocumentMessage;
 import io.onemfive.data.Envelope;
 import io.onemfive.data.util.Multipart;
 import okhttp3.*;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.handler.ContextHandler;
 
 import javax.net.ssl.*;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
 import java.net.Proxy;
 import java.net.URL;
 import java.nio.ByteBuffer;
@@ -31,13 +26,9 @@ public class ClearnetSensor extends BaseSensor {
 
     private static final Logger LOG = Logger.getLogger(ClearnetSensor.class.getName());
 
-    public static final String PROP_HTTP_CLIENT = "1m5.sensors.clearnet.http.client"; // true | false
-    public static final String PROP_HTTP_CLIENT_TLS = "1m5.sensors.clearnet.http.client.tls"; // true | false
-    public static final String PROP_HTTP_CLIENT_TLS_STRONG = "1m5.sensors.clearnet.http.client.tls.strong"; // true | false
-    public static final String PROP_HTTP_SERVER = "1m5.sensors.clearnet.http.server"; // true | false
-    public static final String PROP_HTTP_SERVER_IP = "1m5.sensors.clearnet.http.server.host"; // ipv4 | ipv6 address
-    public static final String PROP_HTTP_SERVER_PORT = "1m5.sensors.clearnet.http.server.port"; // integer
-    public static final String PROP_HTTP_SERVER_PATH = "1m5.sensors.clearnet.http.server.path"; // path
+    public static final String PROP_HTTP_CLIENT = "1m5.clearnet.client"; // true | false
+    public static final String PROP_HTTP_CLIENT_TLS = "1m5.clearnet.client.tls"; // true | false
+    public static final String PROP_HTTP_CLIENT_TLS_STRONG = "1m5.clearnet.client.tls.strong"; // true | false
 
     protected static final Set<String> trustedHosts = new HashSet<>();
 
@@ -74,7 +65,6 @@ public class ClearnetSensor extends BaseSensor {
     protected ConnectionSpec httpsStrongSpec;
     protected OkHttpClient httpsStrongClient;
 
-    protected Server server;
     protected HttpEnvelopeHandler httpHandler;
 
     protected Proxy proxy = null;
@@ -268,124 +258,81 @@ public class ClearnetSensor extends BaseSensor {
     public boolean start(Properties properties) {
         LOG.info("Starting...");
 
-        if("true".equals(properties.getProperty(PROP_HTTP_CLIENT))) {
-            httpSpec = new ConnectionSpec
-                    .Builder(ConnectionSpec.CLEARTEXT)
+        httpSpec = new ConnectionSpec
+                .Builder(ConnectionSpec.CLEARTEXT)
+                .build();
+        if(proxy == null) {
+            httpClient = new OkHttpClient.Builder()
+                    .connectionSpecs(Collections.singletonList(httpSpec))
+                    .retryOnConnectionFailure(true)
+                    .followRedirects(true)
                     .build();
+        } else {
+            httpClient = new OkHttpClient.Builder()
+                    .connectionSpecs(Collections.singletonList(httpSpec))
+                    .retryOnConnectionFailure(true)
+                    .followRedirects(true)
+                    .proxy(proxy)
+                    .build();
+        }
+
+        System.setProperty("https.protocols", "TLSv1,TLSv1.1,TLSv1.2,TLSv1.3");
+        SSLContext sc = null;
+        try {
+            sc = SSLContext.getInstance("TLS");
+            sc.init(null, trustAllCerts, new java.security.SecureRandom());
+
+            httpsCompatibleSpec = new ConnectionSpec
+                    .Builder(ConnectionSpec.COMPATIBLE_TLS)
+//                    .supportsTlsExtensions(true)
+//                    .allEnabledTlsVersions()
+//                    .allEnabledCipherSuites()
+                    .build();
+
             if(proxy == null) {
-                httpClient = new OkHttpClient.Builder()
-                        .connectionSpecs(Collections.singletonList(httpSpec))
-                        .retryOnConnectionFailure(true)
-                        .followRedirects(true)
+                httpsCompatibleClient = new OkHttpClient.Builder()
+                        .sslSocketFactory(sc.getSocketFactory(), x509TrustManager)
+                        .hostnameVerifier(hostnameVerifier)
                         .build();
             } else {
-                httpClient = new OkHttpClient.Builder()
-                        .connectionSpecs(Collections.singletonList(httpSpec))
-                        .retryOnConnectionFailure(true)
-                        .followRedirects(true)
+                httpsCompatibleClient = new OkHttpClient.Builder()
+                        .sslSocketFactory(sc.getSocketFactory(), x509TrustManager)
+                        .hostnameVerifier(hostnameVerifier)
                         .proxy(proxy)
                         .build();
             }
 
-            System.setProperty("https.protocols", "TLSv1,TLSv1.1,TLSv1.2,TLSv1.3");
-            SSLContext sc = null;
-            try {
-                sc = SSLContext.getInstance("TLS");
-                sc.init(null, trustAllCerts, new java.security.SecureRandom());
+            httpsStrongSpec = new ConnectionSpec
+                    .Builder(ConnectionSpec.MODERN_TLS)
+                    .tlsVersions(TlsVersion.TLS_1_2, TlsVersion.TLS_1_3)
+                    .cipherSuites(
+                            CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+                            CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+                            CipherSuite.TLS_DHE_RSA_WITH_AES_128_GCM_SHA256)
+                    .build();
 
-                httpsCompatibleSpec = new ConnectionSpec
-                        .Builder(ConnectionSpec.COMPATIBLE_TLS)
-//                    .supportsTlsExtensions(true)
-//                    .allEnabledTlsVersions()
-//                    .allEnabledCipherSuites()
+            if(proxy == null) {
+                httpsStrongClient = new OkHttpClient.Builder()
+                        .connectionSpecs(Collections.singletonList(httpsStrongSpec))
+                        .retryOnConnectionFailure(true)
+                        .followSslRedirects(true)
+                        .sslSocketFactory(sc.getSocketFactory(), x509TrustManager)
+                        .hostnameVerifier(hostnameVerifier)
                         .build();
-
-                if(proxy == null) {
-                    httpsCompatibleClient = new OkHttpClient.Builder()
-                            .sslSocketFactory(sc.getSocketFactory(), x509TrustManager)
-                            .hostnameVerifier(hostnameVerifier)
-                            .build();
-                } else {
-                    httpsCompatibleClient = new OkHttpClient.Builder()
-                            .sslSocketFactory(sc.getSocketFactory(), x509TrustManager)
-                            .hostnameVerifier(hostnameVerifier)
-                            .proxy(proxy)
-                            .build();
-                }
-
-                httpsStrongSpec = new ConnectionSpec
-                        .Builder(ConnectionSpec.MODERN_TLS)
-                        .tlsVersions(TlsVersion.TLS_1_2, TlsVersion.TLS_1_3)
-                        .cipherSuites(
-                                CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-                                CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-                                CipherSuite.TLS_DHE_RSA_WITH_AES_128_GCM_SHA256)
+            } else {
+                httpsStrongClient = new OkHttpClient.Builder()
+                        .connectionSpecs(Collections.singletonList(httpsStrongSpec))
+                        .retryOnConnectionFailure(true)
+                        .followSslRedirects(true)
+                        .sslSocketFactory(sc.getSocketFactory(), x509TrustManager)
+                        .hostnameVerifier(hostnameVerifier)
+                        .proxy(proxy)
                         .build();
-
-                if(proxy == null) {
-                    httpsStrongClient = new OkHttpClient.Builder()
-                            .connectionSpecs(Collections.singletonList(httpsStrongSpec))
-                            .retryOnConnectionFailure(true)
-                            .followSslRedirects(true)
-                            .sslSocketFactory(sc.getSocketFactory(), x509TrustManager)
-                            .hostnameVerifier(hostnameVerifier)
-                            .build();
-                } else {
-                    httpsStrongClient = new OkHttpClient.Builder()
-                            .connectionSpecs(Collections.singletonList(httpsStrongSpec))
-                            .retryOnConnectionFailure(true)
-                            .followSslRedirects(true)
-                            .sslSocketFactory(sc.getSocketFactory(), x509TrustManager)
-                            .hostnameVerifier(hostnameVerifier)
-                            .proxy(proxy)
-                            .build();
-                }
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                LOG.warning(e.getLocalizedMessage());
             }
-        }
 
-        if("true".equals(properties.getProperty(PROP_HTTP_SERVER))) {
-
-            ContextHandler context = new ContextHandler();
-            context.setContextPath( "/" );
-            context.setHandler( new HttpEnvelopeHandler(this) );
-
-            String host = "127.0.0.1";
-//            String hostProp = properties.getProperty(PROP_HTTP_SERVER_IP);
-//            if(hostProp != null && !"".equals(hostProp)) {
-//                host = hostProp;
-//            }
-            LOG.info("HTTP Server Host: "+host);
-
-            int port = 8080;
-//            String portStr = properties.getProperty(PROP_HTTP_SERVER_PORT);
-//            if(portStr != null) {
-//                port = Integer.parseInt(portStr);
-//            }
-            LOG.info("HTTP Server Port: "+port);
-
-            InetSocketAddress addr = new InetSocketAddress(host,port);
-            server = new Server(addr);
-            server.setHandler(context);
-
-            try {
-                server.start();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            server.dumpStdErr();
-            try {
-                // The use of server.join() the will make the current thread join and
-                // wait until the server is done executing.
-                // See
-                // http://docs.oracle.com/javase/7/docs/api/java/lang/Thread.html#join()
-                server.join();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            LOG.warning(e.getLocalizedMessage());
         }
 
         LOG.info("Started.");
@@ -409,13 +356,6 @@ public class ClearnetSensor extends BaseSensor {
 
     @Override
     public boolean shutdown() {
-        if(server != null) {
-            try {
-                server.stop();
-            } catch (Exception e) {
-                LOG.warning(e.getLocalizedMessage());
-            }
-        }
         return true;
     }
 

@@ -1,4 +1,4 @@
-package io.onemfive.clearnet;
+package io.onemfive.clearnet.client;
 
 import io.onemfive.sensors.SensorsService;
 import io.onemfive.data.DocumentMessage;
