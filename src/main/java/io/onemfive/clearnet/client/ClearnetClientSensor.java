@@ -1,6 +1,7 @@
 package io.onemfive.clearnet.client;
 
 import io.onemfive.sensors.BaseSensor;
+import io.onemfive.sensors.SensorManager;
 import io.onemfive.sensors.SensorsService;
 import io.onemfive.data.Message;
 import io.onemfive.data.util.DLC;
@@ -69,8 +70,8 @@ public class ClearnetClientSensor extends BaseSensor {
 
     public ClearnetClientSensor() {super();}
 
-    public ClearnetClientSensor(SensorsService sensorsService, Envelope.Sensitivity sensitivity, Integer priority) {
-        super(sensorsService, sensitivity, priority);
+    public ClearnetClientSensor(SensorManager sensorManager, Envelope.Sensitivity sensitivity, Integer priority) {
+        super(sensorManager, sensitivity, priority);
     }
 
     @Override
@@ -245,12 +246,12 @@ public class ClearnetClientSensor extends BaseSensor {
     }
 
     void sendToBus(Envelope envelope) {
-        sensorsService.sendToBus(envelope);
+        sensorManager.sendToBus(envelope);
     }
 
     @Override
     public boolean reply(Envelope e) {
-        sensorsService.sendToBus(e);
+        sensorManager.sendToBus(e);
         return true;
     }
 
