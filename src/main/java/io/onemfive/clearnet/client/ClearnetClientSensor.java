@@ -365,8 +365,4 @@ public class ClearnetClientSensor extends BaseSensor {
         return shutdown();
     }
 
-    public static void main(String[] args)  {
-
-    }
-
 }
