@@ -5,7 +5,7 @@
 
 	<groupId>io.onemfive</groupId>
 	<artifactId>clearnet-client</artifactId>
-	<version>0.5.2-SNAPSHOT</version>
+	<version>0.6.0</version>
 
 	<packaging>jar</packaging>
 
@@ -16,7 +16,7 @@
 
 	<name>clearnet-client</name>
 	<url>https://1m5.io</url>
-	<description>Invisible Matrix Services Clearnet Client Library</description>
+	<description>Invisible Matrix Services - Clearnet Client Library</description>
 	<inceptionYear>2017</inceptionYear>
 	<organization>
 		<name>1M5</name>
@@ -31,9 +31,7 @@
 	<developers>
 		<developer>
 			<name>objectorange</name>
-			<organization>Resolving Architecture</organization>
-			<url>http://resolvingarchitecture.com</url>
-			<email>1m5@protonmail.com</email>
+			<email>objectorange@1m5.io</email>
 		</developer>
 	</developers>
 	<scm>
@@ -41,27 +39,6 @@
 		<developerConnection>scm:git@github.com/1m5/1m5-clearnet-client</developerConnection>
 		<url>git@github.com/1m5/1m5-clearnet-client</url>
 	</scm>
-
-	<profiles>
-		<profile>
-			<id>Development</id>
-			<properties>
-				<logfile>/1m5/logs/clearnet-client.log</logfile>
-			</properties>
-		</profile>
-		<profile>
-			<id>QA</id>
-			<properties>
-				<logfile>/1m5/logs/clearnet-client.log</logfile>
-			</properties>
-		</profile>
-		<profile>
-			<id>Production</id>
-			<properties>
-				<logfile>/1m5/logs/clearnet-client.log</logfile>
-			</properties>
-		</profile>
-	</profiles>
 
 	<repositories>
 		<repository>
