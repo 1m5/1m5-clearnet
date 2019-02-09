@@ -187,6 +187,7 @@ public class ClearnetClientSensor extends BaseSensor {
                         return false;
                     }
                 } catch (IOException e1) {
+                    LOG.warning(e1.getLocalizedMessage());
                     m.addErrorMessage(e1.getLocalizedMessage());
                     return false;
                 }
