@@ -11,6 +11,7 @@ import io.onemfive.data.util.Multipart;
 import okhttp3.*;
 
 import javax.net.ssl.*;
+import java.io.File;
 import java.io.IOException;
 import java.net.Proxy;
 import java.net.URL;
@@ -258,7 +259,25 @@ public class ClearnetClientSensor extends BaseSensor {
 
     @Override
     public boolean start(Properties properties) {
-        LOG.info("Starting...");
+        LOG.info("Starting Clearnet Client Sensor...");
+
+        String sensorsDirStr = properties.getProperty("1m5.dir.sensors");
+        if(sensorsDirStr==null) {
+            LOG.warning("1m5.dir.sensors property is null. Please set prior to instantiating Clearnet Client Sensor.");
+            return false;
+        }
+        try {
+            File sensorDir = new File(new File(sensorsDirStr),"clearnet");
+            if(!sensorDir.exists() && !sensorDir.mkdir()) {
+                LOG.warning("Unable to create Clearnet Sensor directory.");
+                return false;
+            } else {
+                properties.put("1m5.dir.sensors.clearnet",sensorDir.getCanonicalPath());
+            }
+        } catch (IOException e) {
+            LOG.warning("IOException caught while building Clearnet sensor directory: \n"+e.getLocalizedMessage());
+            return false;
+        }
 
         httpSpec = new ConnectionSpec
                 .Builder(ConnectionSpec.CLEARTEXT)
