@@ -95,6 +95,9 @@ public class ClearnetClientSensor extends BaseSensor {
         URL url = e.getURL();
         if(url != null) {
             LOG.info("URL="+url.toString());
+        } else {
+            LOG.info("URL must not be null.");
+            return false;
         }
         Map<String,Object> h = e.getHeaders();
         Map<String,String> hStr = new HashMap<>();
