@@ -2,6 +2,7 @@ package io.onemfive.clearnet.client;
 
 import io.onemfive.sensors.BaseSensor;
 import io.onemfive.sensors.SensorManager;
+import io.onemfive.sensors.SensorStatus;
 import io.onemfive.sensors.SensorsService;
 import io.onemfive.data.Message;
 import io.onemfive.data.util.DLC;
@@ -188,6 +189,7 @@ public class ClearnetClientSensor extends BaseSensor {
                     if(!response.isSuccessful()) {
                         LOG.warning(response.toString());
                         m.addErrorMessage(response.code()+"");
+                        handleFailure(m);
                         return false;
                     }
                 } catch (IOException e1) {
@@ -218,6 +220,7 @@ public class ClearnetClientSensor extends BaseSensor {
                 response = httpClient.newCall(req).execute();
                 if(!response.isSuccessful()) {
                     m.addErrorMessage(response.code()+"");
+                    handleFailure(m);
                     return false;
                 }
             } catch (IOException e2) {
@@ -248,6 +251,59 @@ public class ClearnetClientSensor extends BaseSensor {
         }
 
         return true;
+    }
+
+    protected void handleFailure(Message m) {
+        if(m!=null && m.getErrorMessages()!=null && m.getErrorMessages().size()>0) {
+            boolean blocked = false;
+            for (String err : m.getErrorMessages()) {
+                LOG.warning("HTTP Error Message (Tor): " + err);
+                if(!blocked) {
+                    switch (err) {
+                        case "403": {
+                            // Forbidden
+                            LOG.info("Received HTTP 403 response: Forbidden. HTTP Request considered blocked.");
+                            m.addErrorMessage("BLOCKED");
+                            blocked = true;
+                            break;
+                        }
+                        case "408": {
+                            // Request Timeout
+                            LOG.info("Received HTTP 408 response: Request Timeout. HTTP Request considered blocked.");
+                            m.addErrorMessage("BLOCKED");
+                            blocked = true;
+                            break;
+                        }
+                        case "410": {
+                            // Gone
+                            LOG.info("Received HTTP 410 response: Gone. HTTP Request considered blocked.");
+                            m.addErrorMessage("BLOCKED");
+                            blocked = true;
+                            break;
+                        }
+                        case "418": {
+                            // I'm a teapot
+                            LOG.warning("Received HTTP 418 response: I'm a teapot. HTTP Sensor ignoring.");
+                            break;
+                        }
+                        case "451": {
+                            // Unavailable for legal reasons; your IP address might be denied access to the resource
+                            LOG.info("Received HTTP 451 response: unavailable for legal reasons. HTTP Request considered blocked.");
+                            m.addErrorMessage("BLOCKED");
+                            blocked = true;
+                            break;
+                        }
+                        case "511": {
+                            // Network Authentication Required
+                            LOG.info("Received HTTP511 response: network authentication required. HTTP Request considered blocked.");
+                            m.addErrorMessage("BLOCKED");
+                            blocked = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     void sendToBus(Envelope envelope) {
